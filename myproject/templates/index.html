@@ -147,7 +147,7 @@
                 </td>
                 <td><input type="number" class="c-mod" value="${mod}" oninput="calculateComboTotal(this.closest('tr'))"></td>
                 <td><input type="text" class="c-total calc-output" readonly></td>
-                <td><input type="text" class="c-range" value="${cost}"></td>
+                <td><input type="text" class="c-cost" value="${cost}"></td>
                 <td><input type="text" class="c-range" value="${range}"></td>
                 <td class="text-left"><input type="text" class="c-memo" value="${memo}" placeholder="効果やダメージなど"></td>
                 <td><button type="button" onclick="this.closest('tr').remove()">削除</button></td>
@@ -247,9 +247,12 @@
                 if (!name) return;
                 const skill = row.querySelector('.c-skill').value;
                 const total = row.querySelector('.c-total').value;
-                const range = row.querySelector('.c-range').value;
+                const cost = row.querySelector('.c-cost').value || '0';
+                const range = row.querySelector('.c-range').value || '0';
                 const memo = row.querySelector('.c-memo').value;
-                cp += `${total} 【${name}】(${skill}) 射程:${range} ${memo}\n`;
+                
+                // チャットパレットに コスト と 射程 の両方を出力
+                cp += `${total} 【${name}】(${skill}) コスト:${cost} 射程:${range} ${memo}\n`;
             });
 
             cp += "\n▼▼▼ マニューバ一覧 ▼▼▼\n";
@@ -347,8 +350,8 @@
 
     </script>
     <footer>
-	<hr>
-	<p>本ツールは『永い後日談のネクロニカ』（著：インコグニトラボ／出版：アークライト・新紀元社）の非公式ファンツールです。 </p>
-</footer>
+        <hr>
+        <p>本ツールは『永い後日談のネクロニカ』（著：インコグニトラボ／出版：アークライト・新紀元社）の非公式ファンツールです。</p>
+    </footer>
 </body>
 </html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ネクロニカ・キャラクターシート</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; background-color: #fff; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+        th { background-color: #e9e9e9; }
+        input[type="text"], input[type="number"] { width: 95%; box-sizing: border-box; padding: 4px; background-color: rgba(255, 255, 255, 0.7); border: 1px solid #ccc; border-radius: 3px; }
+        select { padding: 3px; background-color: rgba(255, 255, 255, 0.7); }
+        .text-left { text-align: left; }
+        textarea { width: 100%; height: 200px; font-family: monospace; padding: 8px; box-sizing: border-box; }
+
+        /* カテゴリ別背景色 */
+        tr.cat-通常技 { background-color: #d4edda !important; }
+        tr.cat-必殺技 { background-color: #f8d7da !important; }
+        tr.cat-行動値増加 { background-color: #ffe8cc !important; }
+        tr.cat-補助 { background-color: #d1ecf1 !important; }
+        tr.cat-妨害 { background-color: #e2e3e5 !important; }
+        tr.cat-防御生贄 { background-color: #e2d9f3 !important; }
+        tr.cat-移動 { background-color: #fff3cd !important; }
+        
+        .calc-output { background-color: #e9ecef; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>ネクロニカ・キャラクターシート</h1>
+
+    <!-- 1. インポートエリア -->
+    <div class="box">
+        <h3>キャラクター保管所からインポート</h3>
+        <input type="text" id="import-url" placeholder="https://charasheet.vampire-blood.net/XXXXXX" style="width: 60%; padding: 5px;">
+        <button type="button" onclick="importData()" style="padding: 5px 10px;">読み込み</button>
+    </div>
+
+    <!-- 2. 基本情報エリア -->
+    <div class="box">
+        <h3>基本情報</h3>
+        <label>キャラクター名: </label>
+        <input type="text" id="char-name" placeholder="名前を入力" style="width: 250px;">
+    </div>
+
+    <!-- 3. コンボ・武器計算テーブル（技能を4種類に独立分離） -->
+    <div class="box">
+        <h3>コンボ・攻撃計算テーブル</h3>
+        <table id="combo-table">
+            <thead>
+                <tr>
+                    <th style="width: 250px;">武器・コンボ名</th>
+                    <th style="width: 120px;">技能</th>
+                    <th style="width: 100px;">補正</th>
+                    <th style="width: 100px;">計 (判定)</th>
+                    <th style="width: 100px;">コスト</th>
+                    <th style="width: 100px;">射程</th>
+                    <th>その他 (効果メモ)</th>
+                    <th style="width: 50px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="combo-list">
+                <!-- ここにコンボ行が追加されます -->
+            </tbody>
+        </table>
+        <br>
+        <button type="button" onclick="addComboRow()" style="padding: 5px 15px;">＋コンボ枠を増やす</button>
+    </div>
+
+    <!-- 4. マニューバ一覧エリア -->
+    <div class="box">
+        <h3>マニューバ一覧</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35px;">損傷</th>
+                    <th style="width: 35px;">使用</th>
+                    <th style="width: 100px;">カテゴリ</th>
+                    <th style="width: 90px;">部位</th>
+                    <th style="width: 130px;">○マニューバ</th>
+                    <th style="width: 90px;">タイミング</th>
+                    <th style="width: 45px;">ｺｽﾄ</th>
+                    <th style="width: 45px;">射程</th>
+                    <th>効果</th>
+                    <th style="width: 100px;">取得先</th>
+                    <th style="width: 45px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="maneuver-list">
+                <!-- ここに行が動的に追加されます -->
+            </tbody>
+        </table>
+        <br>
+        <button type="button" onclick="addRow()" style="padding: 5px 15px;">＋行を増やす</button>
+    </div>
+
+    <!-- 5. チャットパレット生成エリア -->
+    <div class="box">
+        <h3>チャットパレット生成</h3>
+        <button type="button" onclick="generateChatPalette()" style="padding: 8px 15px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">チャットパレットを作成する</button>
+        <br><br>
+        <textarea id="chat-palette" placeholder="「チャットパレットを作成する」ボタンを押すとここにテキストが生成されます"></textarea>
+    </div>
+
+    <script>
+        const categoryMap = { '1': '通常技', '2': '必殺技', '3': '行動値増加', '4': '補助', '5': '妨害', '6': '防御/生贄', '7': '移動' };
+        const partMap = { '1': 'ﾎﾟｼﾞｼｮﾝ', '2': 'ﾒｲﾝｸﾗｽ', '3': 'ｻﾌﾞｸﾗｽ', '4': '頭', '5': '腕', '6': '胴', '7': '足' };
+        const timingMap = { '0': 'オート', '1': 'アクション', '2': 'ジャッジ', '3': 'ダメージ', '4': 'ラピッド' };
+
+        // --- コンボ計算テーブルの処理 ---
+        function calculateComboTotal(row) {
+            const modVal = parseInt(row.querySelector('.c-mod').value) || 0;
+            const totalInput = row.querySelector('.c-total');
+            
+            if (modVal > 0) {
+                totalInput.value = `1NA+${modVal}`;
+            } else if (modVal < 0) {
+                totalInput.value = `1NA${modVal}`;
+            } else {
+                totalInput.value = `1NA`;
+            }
+        }
+
+        function addComboRow(data = {}) {
+            const tbody = document.getElementById('combo-list');
+            const row = document.createElement('tr');
+
+            const name = data.name || '';
+            const skill = data.skill || '肉弾';
+            const mod = data.mod !== undefined ? data.mod : 0;
+            const cost = data.cost || '0';
+            const range = data.range || '0';
+            const memo = data.memo || '';
+
+            // 技能選択肢を 白兵・肉弾・射撃・砲撃・その他の5つに設定
+            row.innerHTML = `
+                <td><input type="text" class="c-name" value="${name}" placeholder="例: 【あご】+【狂鬼】"></td>
+                <td>
+                    <select class="c-skill">
+                        <option value="肉弾" ${skill === '肉弾' ? 'selected' : ''}>肉弾</option>
+                        <option value="白兵" ${skill === '白兵' ? 'selected' : ''}>白兵</option>
+                        <option value="射撃" ${skill === '射撃' ? 'selected' : ''}>射撃</option>
+                        <option value="砲撃" ${skill === '砲撃' ? 'selected' : ''}>砲撃</option>
+                        <option value="その他" ${skill === 'その他' ? 'selected' : ''}>その他</option>
+                    </select>
+                </td>
+                <td><input type="number" class="c-mod" value="${mod}" oninput="calculateComboTotal(this.closest('tr'))"></td>
+                <td><input type="text" class="c-total calc-output" readonly></td>
+                <td><input type="text" class="c-range" value="${cost}"></td>
+                <td><input type="text" class="c-range" value="${range}"></td>
+                <td class="text-left"><input type="text" class="c-memo" value="${memo}" placeholder="効果やダメージなど"></td>
+                <td><button type="button" onclick="this.closest('tr').remove()">削除</button></td>
+            `;
+            tbody.appendChild(row);
+            calculateComboTotal(row);
+        }
+
+        // --- マニューバテーブルの処理 ---
+        function updateRowColor(selectElem) {
+            const row = selectElem.closest('tr');
+            row.className = '';
+            const category = selectElem.value;
+            if (category) {
+                const classCategory = category.replace('/', '');
+                row.classList.add(`cat-${classCategory}`);
+            }
+        }
+
+        function addRow(data = {}) {
+            const tbody = document.getElementById('maneuver-list');
+            const row = document.createElement('tr');
+
+            const isDamaged = data.damaged ? 'checked' : '';
+            const isUsed = data.used ? 'checked' : '';
+            const category = data.category || '';
+            const part = data.part || '頭';
+            const name = data.name || '';
+            const timing = data.timing || 'オート';
+            const cost = data.cost !== undefined ? data.cost : '';
+            const range = data.range !== undefined ? data.range : '';
+            const effect = data.effect || '';
+            const shozoku = data.shozoku || '';
+
+            row.innerHTML = `
+                <td><input type="checkbox" class="m-damaged" ${isDamaged}></td>
+                <td><input type="checkbox" class="m-used" ${isUsed}></td>
+                <td>
+                    <select class="m-category" onchange="updateRowColor(this)">
+                        <option value=""></option>
+                        <option value="通常技" ${category === '通常技' ? 'selected' : ''}>通常技</option>
+                        <option value="必殺技" ${category === '必殺技' ? 'selected' : ''}>必殺技</option>
+                        <option value="行動値増加" ${category === '行動値増加' ? 'selected' : ''}>行動値増加</option>
+                        <option value="補助" ${category === '補助' ? 'selected' : ''}>補助</option>
+                        <option value="妨害" ${category === '妨害' ? 'selected' : ''}>妨害</option>
+                        <option value="防御/生贄" ${category === '防御/生贄' ? 'selected' : ''}>防御/生贄</option>
+                        <option value="移動" ${category === '移動' ? 'selected' : ''}>移動</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="m-part">
+                        <option value=""></option>
+                        <option value="ﾎﾟｼﾞｼｮﾝ" ${part === 'ﾎﾟｼﾞｼｮﾝ' ? 'selected' : ''}>ﾎﾟｼﾞｼｮﾝ</option>
+                        <option value="ﾒｲﾝｸﾗｽ" ${part === 'ﾒｲﾝｸﾗｽ' ? 'selected' : ''}>ﾒｲﾝｸﾗｽ</option>
+                        <option value="ｻﾌﾞｸﾗｽ" ${part === 'ｻﾌﾞｸﾗｽ' ? 'selected' : ''}>ｻﾌﾞｸﾗｽ</option>
+                        <option value="頭" ${part === '頭' ? 'selected' : ''}>頭</option>
+                        <option value="腕" ${part === '腕' ? 'selected' : ''}>腕</option>
+                        <option value="胴" ${part === '胴' ? 'selected' : ''}>胴</option>
+                        <option value="足" ${part === '足' ? 'selected' : ''}>足</option>
+                    </select>
+                </td>
+                <td><input type="text" class="m-name" value="${name}" placeholder="マニューバ名"></td>
+                <td>
+                    <select class="m-timing">
+                        <option value="オート" ${timing === 'オート' ? 'selected' : ''}>オート</option>
+                        <option value="アクション" ${timing === 'アクション' ? 'selected' : ''}>アクション</option>
+                        <option value="ジャッジ" ${timing === 'ジャッジ' ? 'selected' : ''}>ジャッジ</option>
+                        <option value="ダメージ" ${timing === 'ダメージ' ? 'selected' : ''}>ダメージ</option>
+                        <option value="ラピッド" ${timing === 'ラピッド' ? 'selected' : ''}>ラピッド</option>
+                    </select>
+                </td>
+                <td><input type="text" class="m-cost" value="${cost}"></td>
+                <td><input type="text" class="m-range" value="${range}"></td>
+                <td class="text-left"><input type="text" class="m-effect" value="${effect}"></td>
+                <td><input type="text" class="m-shozoku" value="${shozoku}"></td>
+                <td><button type="button" onclick="this.closest('tr').remove()">削除</button></td>
+            `;
+            tbody.appendChild(row);
+            updateRowColor(row.querySelector('.m-category'));
+        }
+
+        // --- チャットパレット生成処理 ---
+        function generateChatPalette() {
+            let cp = "▼▼▼ 使用表 ▼▼▼\n";
+            cp += "nm 未練決定\n\n";
+
+            cp += "▼▼▼ 判定 ▼▼▼\n";
+            cp += "NC\n";
+            cp += " 行動判定、狂気判定、対話判定はこちら。(nNC+m)\n";
+            cp += "NA\n";
+            cp += " 戦闘時の基本攻撃判定はこちら。（1NA）\n\n";
+
+            cp += "▼▼▼ コンボ・攻撃 ▼▼▼\n";
+            const comboRows = document.querySelectorAll('#combo-list tr');
+            comboRows.forEach(row => {
+                const name = row.querySelector('.c-name').value;
+                if (!name) return;
+                const skill = row.querySelector('.c-skill').value;
+                const total = row.querySelector('.c-total').value;
+                const range = row.querySelector('.c-range').value;
+                const memo = row.querySelector('.c-memo').value;
+                cp += `${total} 【${name}】(${skill}) 射程:${range} ${memo}\n`;
+            });
+
+            cp += "\n▼▼▼ マニューバ一覧 ▼▼▼\n";
+            const mRows = document.querySelectorAll('#maneuver-list tr');
+            mRows.forEach(row => {
+                const name = row.querySelector('.m-name').value;
+                if (!name) return;
+
+                const part = row.querySelector('.m-part').value || '全';
+                const timing = row.querySelector('.m-timing').value || '';
+                const cost = row.querySelector('.m-cost').value || '0';
+                const range = row.querySelector('.m-range').value || '0';
+                const effect = row.querySelector('.m-effect').value || '';
+
+                cp += `【${name}】${part}/${timing}/${cost}/${range} ${effect}\n`;
+            });
+
+            document.getElementById('chat-palette').value = cp;
+        }
+
+        window.onload = function() {
+            addComboRow();
+        };
+
+        // 保管所インポート関数
+        async function importData() {
+            const url = document.getElementById('import-url').value;
+            if (!url) {
+                alert('URLを入力してください');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const data = result.data;
+
+                    if (data.pc_name) {
+                        document.getElementById('char-name').value = data.pc_name;
+                    }
+
+                    document.getElementById('maneuver-list').innerHTML = '';
+
+                    const names = data['Power_name'] || data['Power_name[]'] || [];
+                    const losts = data['Power_Lost'] || data['Power_Lost[]'] || [];
+                    const useds = data['Power_Used'] || data['Power_Used[]'] || [];
+                    const types = data['Power_Type'] || data['Power_Type[]'] || [];
+                    const hanteis = data['V_Power_hantei'] || data['V_Power_hantei[]'] || [];
+                    const timings = data['V_Power_timing'] || data['V_Power_timing[]'] || [];
+                    const costs = data['Power_cost'] || data['Power_cost[]'] || [];
+                    const ranges = data['Power_range'] || data['Power_range[]'] || [];
+                    const memos = data['Power_memo'] || data['Power_memo[]'] || [];
+                    const shozokus = data['Power_shozoku'] || data['Power_shozoku[]'] || [];
+
+                    if (Array.isArray(names) && names.length > 0) {
+                        let count = 0;
+                        for (let i = 0; i < names.length; i++) {
+                            const name = names[i];
+
+                            if (name && name.trim() !== '') {
+                                addRow({
+                                    damaged: String(losts[i]) === '1',
+                                    used: String(useds[i]) === '1',
+                                    category: categoryMap[String(types[i])] || '',
+                                    part: partMap[String(hanteis[i])] || '頭',
+                                    name: name,
+                                    timing: timingMap[String(timings[i])] || 'オート',
+                                    cost: costs[i] !== undefined ? costs[i] : '',
+                                    range: ranges[i] !== undefined ? ranges[i] : '',
+                                    effect: memos[i] || '',
+                                    shozoku: shozokus[i] || ''
+                                });
+                                count++;
+                            }
+                        }
+                        alert(`インポート成功！ ${count} 件のマニューバを読み込みました。`);
+                    } else {
+                        alert('マニューバデータが見つかりませんでした。');
+                    }
+
+                } else {
+                    alert('エラー: ' + result.error);
+                }
+            } catch (err) {
+                alert('通信エラーが発生しました: ' + err);
+            }
+        }
+
+    </script>
+    <footer>
+	<hr>
+	<p>本ツールは『永い後日談のネクロニカ』（著：インコグニトラボ／出版：アークライト・新紀元社）の非公式ファンツールです。</p>
+</footer>
+</body>
+</html>

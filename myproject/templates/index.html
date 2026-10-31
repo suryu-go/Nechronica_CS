@@ -12,7 +12,7 @@
         input[type="text"], input[type="number"] { width: 95%; box-sizing: border-box; padding: 4px; background-color: rgba(255, 255, 255, 0.7); border: 1px solid #ccc; border-radius: 3px; }
         select { padding: 3px; background-color: rgba(255, 255, 255, 0.7); }
         .text-left { text-align: left; }
-        textarea { width: 100%; height: 200px; font-family: monospace; padding: 8px; box-sizing: border-box; }
+        textarea { width: 100%; height: 180px; font-family: monospace; padding: 8px; box-sizing: border-box; }
 
         /* カテゴリ別背景色 */
         tr.cat-通常技 { background-color: #d4edda !important; }
@@ -30,11 +30,22 @@
 
     <h1>ネクロニカ・キャラクターシート</h1>
 
-    <!-- 1. インポートエリア -->
+    <!-- 1. インポートエリア（URL） -->
     <div class="box">
-        <h3>キャラクター保管所からインポート</h3>
+        <h3>キャラクター保管所からインポート (URL)</h3>
         <input type="text" id="import-url" placeholder="https://charasheet.vampire-blood.net/XXXXXX" style="width: 60%; padding: 5px;">
         <button type="button" onclick="importData()" style="padding: 5px 10px;">読み込み</button>
+    </div>
+
+    <!-- 1. インポートエリア（テキスト） -->
+    <div class="box">
+        <h3>テキストデータからインポート</h3>
+        <p style="font-size: 12px; color: #666;">
+            キャラクター保管所のテキスト出力データをそのまま貼り付けて読み込めます。
+        </p>
+        <textarea id="import-text" placeholder="ここに保管所のテキストデータを貼り付け..."></textarea>
+        <br><br>
+        <button type="button" onclick="importTextData()" style="padding: 5px 15px; background-color: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">テキストから読み込む</button>
     </div>
 
     <!-- 2. 基本情報エリア -->
@@ -44,7 +55,7 @@
         <input type="text" id="char-name" placeholder="名前を入力" style="width: 250px;">
     </div>
 
-    <!-- 3. コンボ・武器計算テーブル（技能を4種類に独立分離） -->
+    <!-- 3. コンボ・武器計算テーブル -->
     <div class="box">
         <h3>コンボ・攻撃計算テーブル</h3>
         <table id="combo-table">
@@ -100,12 +111,12 @@
         <h3>チャットパレット生成</h3>
         <button type="button" onclick="generateChatPalette()" style="padding: 8px 15px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">チャットパレットを作成する</button>
         <br><br>
-        <textarea id="chat-palette" placeholder="「チャットパレットを作成する」ボタンを押すとここにテキストが生成されます"></textarea>
+        <textarea id="chat-palette" placeholder="「チャットパレットを作成する」ボタンを押すとここにテキストが生成されます" style="height: 200px;"></textarea>
     </div>
 
     <script>
         const categoryMap = { '1': '通常技', '2': '必殺技', '3': '行動値増加', '4': '補助', '5': '妨害', '6': '防御/生贄', '7': '移動' };
-        const partMap = { '1': 'ﾎﾟｼﾞｼｮﾝ', '2': 'ﾒｲﾝｸﾗｽ', '3': 'ｻﾌﾞｸﾗｽ', '4': '頭', '5': '腕', '6': '胴', '7': '足' };
+        const partMap = { '1': 'ﾎﾟｼﾞｼｮﾝ', '2': 'ﾒｲﾝｸﾗｽ', '3': 'ｻﾌﾞｸﾗｽ', '4': '頭', '5': '腕', '6': '胴', '7': '脚' };
         const timingMap = { '0': 'オート', '1': 'アクション', '2': 'ジャッジ', '3': 'ダメージ', '4': 'ラピッド' };
 
         // --- コンボ計算テーブルの処理 ---
@@ -133,7 +144,6 @@
             const range = data.range || '0';
             const memo = data.memo || '';
 
-            // 技能選択肢を 白兵・肉弾・射撃・砲撃・その他の5つに設定
             row.innerHTML = `
                 <td><input type="text" class="c-name" value="${name}" placeholder="例: 【あご】+【狂鬼】"></td>
                 <td>
@@ -206,7 +216,7 @@
                         <option value="頭" ${part === '頭' ? 'selected' : ''}>頭</option>
                         <option value="腕" ${part === '腕' ? 'selected' : ''}>腕</option>
                         <option value="胴" ${part === '胴' ? 'selected' : ''}>胴</option>
-                        <option value="足" ${part === '足' ? 'selected' : ''}>足</option>
+                        <option value="脚" ${part === '脚' ? 'selected' : ''}>脚</option>
                     </select>
                 </td>
                 <td><input type="text" class="m-name" value="${name}" placeholder="マニューバ名"></td>
@@ -251,7 +261,6 @@
                 const range = row.querySelector('.c-range').value || '0';
                 const memo = row.querySelector('.c-memo').value;
                 
-                // チャットパレットに コスト と 射程 の両方を出力
                 cp += `${total} 【${name}】(${skill}) コスト:${cost} 射程:${range} ${memo}\n`;
             });
 
@@ -277,7 +286,7 @@
             addComboRow();
         };
 
-        // 保管所インポート関数
+        // 保管所URLインポート関数
         async function importData() {
             const url = document.getElementById('import-url').value;
             if (!url) {
@@ -348,6 +357,72 @@
             }
         }
 
+        // --- テキストデータインポート関数 ---
+        function importTextData() {
+            const text = document.getElementById('import-text').value;
+            if (!text.trim()) {
+                alert('テキストデータを入力してください');
+                return;
+            }
+
+            const lines = text.split('\n');
+            let count = 0;
+
+            // キャラクター名の抽出
+            lines.forEach(line => {
+                const nameMatch = line.match(/^キャラクター名[：:]\s*(.+)$/);
+                if (nameMatch) {
+                    document.getElementById('char-name').value = nameMatch[1].trim();
+                }
+            });
+
+            // マニューバリストをクリア
+            document.getElementById('maneuver-list').innerHTML = '';
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                // 保管所テキスト出力形式のパース
+                const storageMatch = line.match(/^\[(.*?)\]\s+(.+?)\s*:\s*(.*?)\s*:\s*(.*?)\s*:\s*(.*?)\s*:\s*(.*)$/);
+
+                if (storageMatch) {
+                    const rawPart = storageMatch[1].trim();
+                    const name = storageMatch[2].trim();
+                    const timing = storageMatch[3].trim();
+                    const cost = storageMatch[4].trim();
+                    const range = storageMatch[5].trim();
+                    const effect = storageMatch[6].trim();
+
+                    // 部位の正規化
+                    let part = '頭';
+                    if (rawPart.includes('ポジション')) part = 'ﾎﾟｼﾞｼｮﾝ';
+                    else if (rawPart.includes('メイン')) part = 'ﾒｲﾝｸﾗｽ';
+                    else if (rawPart.includes('サブ')) part = 'ｻﾌﾞｸﾗｽ';
+                    else if (['頭', '腕', '胴', '脚', '足'].includes(rawPart)) {
+                        part = (rawPart === '足') ? '脚' : rawPart;
+                    } else {
+                        part = rawPart;
+                    }
+
+                    addRow({
+                        name: name,
+                        part: part,
+                        timing: timing || 'オート',
+                        cost: cost,
+                        range: range,
+                        effect: effect
+                    });
+                    count++;
+                }
+            });
+
+            if (count > 0) {
+                alert(`テキストから ${count} 件のマニューバを読み込みました！`);
+            } else {
+                alert('有効なマニューバデータが見つかりませんでした。保管所のテキスト形式（[脚] マニューバ名 : ...）になっているか確認してください。');
+            }
+        }
     </script>
     <footer>
         <hr>
